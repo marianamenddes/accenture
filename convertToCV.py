@@ -1,3 +1,10 @@
+# ⬇️ Instala bibliotecas necessárias
+!pip install -q pandas python-pptx pillow
+
+# 📁 Upload do Excel
+from google.colab import files
+uploaded = files.upload()
+
 # 📚 Imports
 import pandas as pd
 from pptx import Presentation
@@ -25,9 +32,9 @@ def abrevia_mes(data_str):
     except:
         return data_str
 
-# Ler Excel local
-EXCEL_FILENAME = "resultado.xlsx"  # Troque para o nome do seu arquivo
-df = pd.read_excel(EXCEL_FILENAME)
+# Ler Excel
+filename = list(uploaded.keys())[0]
+df = pd.read_excel(io.BytesIO(uploaded[filename]))
 
 def get_start_date(date_range):
     try:
@@ -55,24 +62,36 @@ for name, data in grouped:
     job_title = data["Job Title"].iloc[0]
     profile = data["Profile"].iloc[0] if pd.notna(data["Profile"].iloc[0]) else ""
     
-    # Educação: uma linha por curso
+    # Educação (trocar ";" por parágrafos)
     education_list = data["Education"].dropna().unique()
+    edu_lines = []
+    for edu in education_list:
+        parts = str(edu).split(";")
+        for part in parts:
+            sub_parts = [p.strip() for p in part.split('-')]
+            edu_lines.append(" - ".join(sub_parts))
     
-    # Skills (3 colunas)
+    # Skills (máximo 10)
     skills_cols = ["Skill", "Specialization Skills", "Specialization  Branch Skills"]
-    skills_set = set()
+    skills_set = []
+    seen_skills = set()
     for col in skills_cols:
         if col in data.columns:
             for val in data[col].dropna().unique():
                 val = str(val).strip()
-                if val:
-                    skills_set.add(val)
-    skills_text = "\n".join(sorted(skills_set))
+                if val and val not in seen_skills:
+                    skills_set.append(val)
+                    seen_skills.add(val)
+                    if len(skills_set) >= 10:
+                        break
+        if len(skills_set) >= 10:
+            break
+    skills_text = "\n".join(skills_set)
     
     # Industries
     industries = "\n".join(data["Industry Networks"].dropna().unique()) if "Industry Networks" in data.columns else ""
     
-    # Languages - só mostrar se existir, em baixo das industries
+    # Languages
     lang_str = data["Language"].iloc[0] if "Language" in data.columns else ""
     languages_list = [x.strip() for x in str(lang_str).split(",")] if lang_str else []
     languages = "\n".join(languages_list)
@@ -93,13 +112,13 @@ for name, data in grouped:
             with open("temp_photo.png", "wb") as f:
                 f.write(img_data)
             slide.shapes.add_picture("temp_photo.png", Inches(0.3), Inches(0.3), Inches(1.5), Inches(1.5))
-            os.remove("temp_photo.png")
         except:
             pass
     
     # Profile (caixa larga)
     profile_box = slide.shapes.add_textbox(Inches(0.5), Inches(1.6), Inches(8.5), Inches(1.2))
     profile_frame = profile_box.text_frame
+    profile_frame.word_wrap = True
     profile_frame.text = "Profile"
     profile_frame.paragraphs[0].runs[0].font.bold = True
     profile_frame.paragraphs[0].runs[0].font.color.rgb = ACCENT_COLOR
@@ -107,20 +126,22 @@ for name, data in grouped:
     p.text = profile
     p.font.size = TEXT_FONT_SIZE
     
-    # Educação (um curso por linha)
-    edu_box = slide.shapes.add_textbox(Inches(0.5), Inches(2.9), Inches(4), Inches(1.2))
+    # Educação
+    edu_box = slide.shapes.add_textbox(Inches(0.5), Inches(2.9), Inches(4), Inches(1.5))
     edu_frame = edu_box.text_frame
+    edu_frame.word_wrap = True
     edu_frame.text = "Education"
     edu_frame.paragraphs[0].runs[0].font.bold = True
     edu_frame.paragraphs[0].runs[0].font.color.rgb = ACCENT_COLOR
-    for curso in education_list:
+    for line in edu_lines:
         p = edu_frame.add_paragraph()
-        p.text = str(curso)
+        p.text = line
         p.font.size = TEXT_FONT_SIZE
     
-    # Skills (caixa esquerda)
+    # Skills
     skills_box = slide.shapes.add_textbox(Inches(0.5), Inches(4.0), Inches(3), Inches(2))
     skills_frame = skills_box.text_frame
+    skills_frame.word_wrap = True
     skills_frame.text = "Skills"
     skills_frame.paragraphs[0].runs[0].font.bold = True
     skills_frame.paragraphs[0].runs[0].font.color.rgb = ACCENT_COLOR
@@ -128,10 +149,11 @@ for name, data in grouped:
     p.text = skills_text
     p.font.size = TEXT_FONT_SIZE
     
-    # Industries (aparece só se tiver)
+    # Industries
     if industries.strip():
         industries_box = slide.shapes.add_textbox(Inches(3.6), Inches(4.0), Inches(3), Inches(1.2))
         industries_frame = industries_box.text_frame
+        industries_frame.word_wrap = True
         industries_frame.text = "Industries"
         industries_frame.paragraphs[0].runs[0].font.bold = True
         industries_frame.paragraphs[0].runs[0].font.color.rgb = ACCENT_COLOR
@@ -143,6 +165,7 @@ for name, data in grouped:
         if languages.strip():
             languages_box = slide.shapes.add_textbox(Inches(3.6), Inches(5.3), Inches(3), Inches(1))
             languages_frame = languages_box.text_frame
+            languages_frame.word_wrap = True
             languages_frame.text = "Languages"
             languages_frame.paragraphs[0].runs[0].font.bold = True
             languages_frame.paragraphs[0].runs[0].font.color.rgb = ACCENT_COLOR
@@ -154,6 +177,7 @@ for name, data in grouped:
         if languages.strip():
             languages_box = slide.shapes.add_textbox(Inches(3.6), Inches(4.0), Inches(3), Inches(1))
             languages_frame = languages_box.text_frame
+            languages_frame.word_wrap = True
             languages_frame.text = "Languages"
             languages_frame.paragraphs[0].runs[0].font.bold = True
             languages_frame.paragraphs[0].runs[0].font.color.rgb = ACCENT_COLOR
@@ -161,12 +185,21 @@ for name, data in grouped:
             p.text = languages
             p.font.size = TEXT_FONT_SIZE
 
-    # Relevant Experience (lado direito)
-    exp_box = slide.shapes.add_textbox(Inches(6.8), Inches(1.6), Inches(3.5), Inches(6))
+    # Relevant Experience (mover para a esquerda de 6.8 para 6.0)
+    exp_box_height = 6
+    exp_box_top = 1.6
+    n_proj = min(len(data), 5)
+    approx_para_height = 0.3
+    total_text_height = (1 + n_proj * 3) * approx_para_height
+    top_pos = exp_box_top + max(0, (exp_box_height - total_text_height) / 2)
+
+    exp_box = slide.shapes.add_textbox(Inches(6.0), Inches(top_pos), Inches(3.5), Inches(exp_box_height))
     exp_frame = exp_box.text_frame
+    exp_frame.word_wrap = True
     exp_frame.text = "Relevant Experience"
     exp_frame.paragraphs[0].runs[0].font.bold = True
     exp_frame.paragraphs[0].runs[0].font.color.rgb = ACCENT_COLOR
+    exp_frame.paragraphs[0].font.size = TEXT_FONT_SIZE
 
     recent_projects = data.sort_values(by="start_date", ascending=False).head(5)
     for _, row in recent_projects.iterrows():
@@ -174,7 +207,6 @@ for name, data in grouped:
         proj_name = row["Project Name"]
         desc = row["Description"]
 
-        # Formatar datas com abreviação dos meses
         if isinstance(proj_date, str) and '-' in proj_date:
             try:
                 start, end = proj_date.split('-')
@@ -186,7 +218,6 @@ for name, data in grouped:
         else:
             date_str = proj_date
 
-        # Adiciona cada parte como parágrafo separado
         for part in [str(date_str), str(proj_name), str(desc)]:
             p = exp_frame.add_paragraph()
             p.text = part.strip()
@@ -196,4 +227,6 @@ for name, data in grouped:
     safe_name = name.replace(" ", "_").lower()
     prs.save(f"CVs/{safe_name}.pptx")
 
-print("Todos os CVs foram gerados na pasta 'CVs'.")
+# Compactar e download
+!zip -r CVs.zip CVs
+files.download("CVs.zip")
