@@ -1,10 +1,3 @@
-# ⬇️ Instala bibliotecas necessárias
-!pip install -q pandas python-pptx pillow
-
-# 📁 Upload do Excel
-from google.colab import files
-uploaded = files.upload()
-
 # 📚 Imports
 import pandas as pd
 from pptx import Presentation
@@ -32,9 +25,9 @@ def abrevia_mes(data_str):
     except:
         return data_str
 
-# Ler Excel
-filename = list(uploaded.keys())[0]
-df = pd.read_excel(io.BytesIO(uploaded[filename]))
+# Ler Excel local
+EXCEL_FILENAME = "resultado.xlsx"  # Troque para o nome do seu arquivo
+df = pd.read_excel(EXCEL_FILENAME)
 
 def get_start_date(date_range):
     try:
@@ -100,6 +93,7 @@ for name, data in grouped:
             with open("temp_photo.png", "wb") as f:
                 f.write(img_data)
             slide.shapes.add_picture("temp_photo.png", Inches(0.3), Inches(0.3), Inches(1.5), Inches(1.5))
+            os.remove("temp_photo.png")
         except:
             pass
     
@@ -202,6 +196,4 @@ for name, data in grouped:
     safe_name = name.replace(" ", "_").lower()
     prs.save(f"CVs/{safe_name}.pptx")
 
-# Compactar e download
-!zip -r CVs.zip CVs
-files.download("CVs.zip")
+print("Todos os CVs foram gerados na pasta 'CVs'.")
